@@ -1,10 +1,11 @@
 # ARGOFLAT: The Argo dataset as a lossless, analysis-ready, cloud-optimized contiguous ragged array
-A solution to enable fast random access to Argo profiles and ML-ready batch sampling from a global aggregate.
+A simple solution to enable fast random access to Argo profiles and ML-ready batch sampling from a global aggregate.
 
 ‼️ Work in progress ‼️
 
 ## Basic concept
 
+<img src="https://raw.githubusercontent.com/euroargodev/argoflat/master/docs/_static/ARGOFLAT_basic_concept.jpeg" alt="argoflat" width="800"/>
 
 ## Expect API
 
