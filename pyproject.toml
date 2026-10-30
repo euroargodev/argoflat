@@ -1,7 +1,7 @@
 [project]
 name = "argoflat"
 version = "0.1.0"
-description = "ARGOFLAT: the Argo dataset as a lossless, analysis-ready cloud-optimised contiguous ragged array"
+description = "ARGOFLAT: The Argo dataset as a lossless, analysis-ready cloud-optimised contiguous ragged array"
 readme = "README.md"
 authors = [
     { name = "Guillaume Maze", email = "gmaze@ifremer.fr" }
