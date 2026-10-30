@@ -3,17 +3,31 @@ A simple solution to enable fast random access to Argo profiles and ML-ready bat
 
 ‼️ Work in progress ‼️
 
+Our full Argo dataset is currently build with the entire GDAC and pressure, temperature and salinity data (BGC will come).
+
+The dataset:
+- has: 20_565 floats, 3_418_235 P/T/S profiles and 1_360_094_341 measurements points.
+- is about ~10.8 GB, as one or more zarr stores.
+- is available for testing in 3 versions:
+  - As a single zarr store (~10.8 GB)
+  - As a collection of 11 zarr stores (~1 GB) with about 2000 floats each
+  - As a collection of 21 zarr stores (~500 MB) with about 1000 floats each 
+
+
 ## Basic concept
 
 <img src="https://raw.githubusercontent.com/euroargodev/argoflat/master/docs/_static/ARGOFLAT_basic_concept.jpeg" alt="argoflat" width="800"/>
 
-## Expect API
+## User API
 
 Open or connect to an ArgoFlat dataset:
 ```python
 from argoflat import FlatData
 
-fd = FlatData("argoflat_expert.zarr")
+fd = FlatData("stores/argoflat_expert_000.zarr")
+fd = FlatData("stores_1000/argoflat_expert_0*.zarr")
+fd = FlatData("stores_2000/argoflat_expert_0*.zarr")
+
 # fd = FlatData("argoflat_standard.zarr")
 # fd = FlatData("argoflat_research.zarr")
 # fd = FlatData("s3://bucket/argoflat_*.zarr", anon=True)
@@ -32,10 +46,12 @@ ds = fd.profile([1901514, 1902284], 3)
 ds = fd.profile([1901514, 1902284], [2, 3])
 ```
 
-Profiles selection using standard 0-based array indexing:
+Or use profiles selection with standard 0-based indexing:
 ```python
 ds = fd[100] 
 ds = fd[10:20] 
 ds = fd[[1, 5, 8]]
 ds = fd[:] # Full dataset !
 ```
+
+The xarray dataset that is return has all profiles meta-data loaded in memory (eg: LATITUDE, LONGITUDE, etc ...) and all measurements in 1_000_000 points chunks (eg: PRES, TEMP, etc...).

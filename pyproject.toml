@@ -29,6 +29,8 @@ dev = [
     "black>=26.10.1",
     "ipykernel>=7.4.0",
     "ipython>=9.17.1",
+    "matplotlib>=3.11.2",
     "pypi>=2.1",
     "pytest>=9.1.1",
+    "python-dotenv>=1.2.4",
 ]

@@ -43,6 +43,7 @@ class FlatData:
     >>> fd = FlatData("stores/argo_*.zarr")                 # a collection of stores
     >>> fd = FlatData(["a.zarr", "b.zarr"])
     >>> fd = FlatData("s3://bucket/argo_*.zarr", anon=True)
+
     >>> ds = fd.float(1901514)
     >>> ds = fd.float([1901514, 1902284])
     >>> ds = fd.profile(1901514, [2, 3])
@@ -126,7 +127,8 @@ class FlatData:
 
     @property
     def PROF_VARS(self):
-        return [v for v in self.prf.data_vars if v not in ("row_start", "row_size", "STORE")]
+        return [v for v in self.prf.data_vars]
+        # return [v for v in self.prf.data_vars if v not in ("row_start", "row_size", "STORE")]
 
     # ------------------------------------------------------------ core method
     @staticmethod
@@ -174,7 +176,7 @@ class FlatData:
                 parts.append(self.pts_stores[k].isel(N_POINTS=start[local][pm] + level[pm]))
         out = parts[0] if len(parts) == 1 else xr.concat(parts, "N_POINTS", combine_attrs="override")
 
-        out = out.assign_coords(LEVEL=("N_POINTS", level))
+        out = out.assign_coords(N_LEVELS=("N_POINTS", level))
 
         # Profile variables
         p = self.prf[self.PROF_VARS].isel(N_PROF=sel)
