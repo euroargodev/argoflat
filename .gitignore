@@ -15,5 +15,5 @@ wheels/
 *.log
 *.sh
 local_work/
-#cli/
+cli/
 DEV.md
