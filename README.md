@@ -3,11 +3,11 @@ A simple solution to enable fast random access to Argo profiles and ML-ready bat
 
 ‼️ Work in progress ‼️
 
-Our full Argo dataset is currently build with the entire GDAC and pressure, temperature and salinity data (BGC will come).
+Our full Argo dataset is currently build with the entire GDAC and pressure, temperature and salinity data (BGC data will follow).
 
 The dataset:
-- has: 20_565 floats, 3_418_235 P/T/S profiles and 1_360_094_341 measurements points.
-- is about ~10.8 GB, as one or more zarr stores.
+- has: 20_565 floats, 3_418_235 P/T/S profiles and 1_360_094_341 measurement points.
+- is about 10.8 GB, as one or more zarr stores.
 - is available for testing in 3 versions:
   - As a single zarr store (~10.8 GB)
   - As a collection of 11 zarr stores (~1 GB) with about 2000 floats each
@@ -33,7 +33,7 @@ fd = FlatData("stores_2000/argoflat_expert_0*.zarr")
 # fd = FlatData("s3://bucket/argoflat_*.zarr", anon=True)
 ```
 
-Use profiles selectors similar to [Argopy access point syntax](https://argopy.readthedocs.io/en/latest/user-guide/fetching-argo-data/data_selection.html):
+Use profile selectors similar to [Argopy access point syntax](https://argopy.readthedocs.io/en/latest/user-guide/fetching-argo-data/data_selection.html):
 ```python
 ds = fd.region([-75., 0., 0., 45.])
 ds = fd.region([-75., 0., 0., 45., '20000101', '20201231'])
@@ -46,7 +46,7 @@ ds = fd.profile([1901514, 1902284], 3)
 ds = fd.profile([1901514, 1902284], [2, 3])
 ```
 
-Or use profiles selection with standard 0-based indexing:
+Or use profile selection with standard 0-based indexing:
 ```python
 ds = fd[100] 
 ds = fd[10:20] 
@@ -54,4 +54,4 @@ ds = fd[[1, 5, 8]]
 ds = fd[:] # Full dataset !
 ```
 
-The xarray dataset that is return has all profiles meta-data loaded in memory (eg: LATITUDE, LONGITUDE, etc ...) and all measurements in 1_000_000 points chunks (eg: PRES, TEMP, etc...).
+The xarray dataset that is returned has all profiles meta-data loaded in memory (eg: LATITUDE, LONGITUDE, etc ...) and all measurements in chunks of 1_000_000 points (e.g.: PRES, TEMP, etc...).
