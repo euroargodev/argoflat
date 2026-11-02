@@ -55,3 +55,6 @@ ds = fd[:] # Full dataset !
 ```
 
 The xarray dataset that is returned has all profiles meta-data loaded in memory (eg: LATITUDE, LONGITUDE, etc ...) and all measurements in chunks of 1_000_000 points (e.g.: PRES, TEMP, etc...).
+
+***
+🫣 [qwen 3.8](https://huggingface.co/Qwen/Qwen3.8-27B) running on Ifremer self hosted [openwebui](https://openwebui.com) was used in this _shame project_. 
