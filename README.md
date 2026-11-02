@@ -3,11 +3,11 @@ A simple solution to enable fast random access to Argo profiles and ML-ready bat
 
 ‼️ Work in progress ‼️
 
-Our full Argo dataset is currently build with the entire GDAC and pressure, temperature and salinity data (BGC data will follow).
+Our full Argo dataset is currently build with the entire GDAC pressure, temperature and salinity data (BGC data will follow).
 
 The dataset:
 - has: 20_565 floats, 3_418_235 P/T/S profiles and 1_360_094_341 measurement points.
-- is about 10.8 GB, as one or more zarr stores.
+- is about 11 GB, as one or more zarr stores.
 - is available for testing in 3 versions:
   - As a single zarr store (~10.8 GB)
   - As a collection of 11 zarr stores (~1 GB) with about 2000 floats each
@@ -24,9 +24,9 @@ Open or connect to an ArgoFlat dataset:
 ```python
 from argoflat import FlatData
 
-fd = FlatData("stores/argoflat_expert_000.zarr")
-fd = FlatData("stores_1000/argoflat_expert_0*.zarr")
-fd = FlatData("stores_2000/argoflat_expert_0*.zarr")
+fd = FlatData("stores/argoflat_expert_000.zarr")  # all floats in 1 zarr
+# fd = FlatData("stores_1000/argoflat_expert_0*.zarr") # 1000 floats per zarr
+# fd = FlatData("stores_2000/argoflat_expert_0*.zarr") # 2000 floats per zarr
 
 # fd = FlatData("argoflat_standard.zarr")
 # fd = FlatData("argoflat_research.zarr")
