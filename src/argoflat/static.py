@@ -18,7 +18,7 @@ class VariablesShort:
     )
 
 class Variables:
-    """Argo variables grouped by dimension."""
+    """Argo default variables grouped by dimension. For multiprofile files."""
 
     LEVEL_VARS: ClassVar[tuple[str, ...]] = (
         'PRES',
