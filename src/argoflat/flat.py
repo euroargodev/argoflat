@@ -8,6 +8,8 @@ import xarray as xr
 
 from argopy.utils.checkers import check_wmo, check_cyc
 
+from argoflat.utils import merge_blocks
+
 
 class FlatData:
     """Argo dataset as a flat (ragged) collection of points, backed by one or several Zarr stores
@@ -52,8 +54,8 @@ class FlatData:
     >>> ds = fd[100]; ds = fd[10:20]; ds = fd[[1, 5, 8]]
     """
 
-    # Number of contiguous runs above which we fall back to a single fancy ``isel`` per store
-    # instead of concatenating one slice per run.
+    # Number of contiguous blocks above which we fall back to a single ``isel`` per store
+    # instead of concatenating one slice per block.
     MAX_RUNS = 50
 
     def __init__(self, stores, broadcast=False, **storage_options):
@@ -94,6 +96,12 @@ class FlatData:
             prf = xr.open_zarr(
                 path, group="profiles", **self._kw
             ).load()  # index, fits in memory
+            if 'JULD' in prf:
+                self._TIME = 'JULD'
+            elif 'TIME' in prf:
+                self._TIME = 'TIME'
+            else:
+                raise RuntimeError("No time variable !")
             pts = xr.open_zarr(path, group="points", **self._kw)  # lazy
 
             n_valid, n_pts = int(prf["row_size"].sum()), pts.sizes["N_POINTS"]
@@ -152,16 +160,9 @@ class FlatData:
         return [v for v in self.prf.data_vars]
         # return [v for v in self.prf.data_vars if v not in ("row_start", "row_size", "STORE")]
 
-    # ------------------------------------------------------------ core method
-    @staticmethod
-    def _runs(starts, ends):
-        """Merge consecutive [start, end) intervals (given in ascending order) into contiguous runs"""
-        breaks = np.flatnonzero(starts[1:] != ends[:-1]) + 1
-        run_starts = starts[np.r_[0, breaks]]
-        run_ends = ends[np.r_[breaks - 1, len(ends) - 1]]
-        return run_starts, run_ends
-
     def _get_profiles(self, sel, broadcast=None):
+        """Given sel profile indexes, figure out which point-ranges to read from which stores,
+        and read them efficiently."""
         broadcast = self.broadcast if broadcast is None else broadcast
 
         sel = np.unique(np.atleast_1d(sel).astype("int64"))  # sorted, unique
@@ -181,25 +182,25 @@ class FlatData:
 
         # Lazy selection of the points: sel is sorted, so stores are visited in order and the
         # points come out in the same order as the profiles.
-        runs = []  # (store, run_starts, run_ends)
+        blocks = []  # (store, block_starts, block_ends)
         for k in np.unique(store):
             m = store == k
-            rs, re = self._runs(start[m], start[m] + size[m])
-            runs.append((k, rs, re))
+            block_starts, block_ends = merge_blocks(start[m], start[m] + size[m])
+            blocks.append((k, block_starts, block_ends))
 
-        if sum(len(rs) for _, rs, _ in runs) <= self.MAX_RUNS:
+        if sum(len(block_starts) for _, block_starts, _ in blocks) <= self.MAX_RUNS:
             parts = [
-                self.pts_stores[k].isel(N_POINTS=slice(int(a), int(b)))
-                for k, rs, re in runs
-                for a, b in zip(rs, re)
+                self.pts_stores[store].isel(N_POINTS=slice(int(a), int(b)))
+                for store, block_starts, block_ends in blocks
+                for a, b in zip(block_starts, block_ends)
             ]
         else:
             point_store = store[local]
             parts = []
-            for k, _, _ in runs:
-                pm = point_store == k
+            for store, _, _ in blocks:
+                pm = point_store == store
                 parts.append(
-                    self.pts_stores[k].isel(N_POINTS=start[local][pm] + level[pm])
+                    self.pts_stores[store].isel(N_POINTS=start[local][pm] + level[pm])
                 )
         out = (
             parts[0]
@@ -244,7 +245,7 @@ class FlatData:
         cond &= (lat >= box[2]) & (lat < box[3])
 
         if len(box) == 6:
-            juld = self.prf["JULD"].values
+            juld = self.prf[self._TIME].values
             cond &= (juld >= pd.to_datetime(box[4]).to_datetime64()) & (
                 juld < pd.to_datetime(box[5]).to_datetime64()
             )
@@ -317,7 +318,7 @@ class FlatData:
                 return (v.min(), v.max()) if v.size else (None, None)
             return (np.nanmin(v), np.nanmax(v))
 
-        return {"lon": mm("LONGITUDE"), "lat": mm("LATITUDE"), "time": mm("JULD")}
+        return {"lon": mm("LONGITUDE"), "lat": mm("LATITUDE"), "time": mm(self._TIME)}
 
     # --------------------------------------------------------------- dunders
     def __len__(self):
