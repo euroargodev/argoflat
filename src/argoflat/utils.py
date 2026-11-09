@@ -1,14 +1,56 @@
 import numpy as np
+import xarray as xr
+import glob
+import os
 
 
-# def merge_blocks(starts, ends):
-#     """Merge consecutive [start, end) intervals (given in ascending order) into contiguous runs"""
-#     breaks = np.flatnonzero(starts[1:] != ends[:-1]) + 1  # where a gap appears
-#     run_starts = starts[np.r_[0, breaks]] # np.r_: a compact way to write np.concatenate
-#     run_ends = ends[np.r_[breaks - 1, len(ends) - 1]]
-#     return run_starts, run_ends
+def resolve_stores(
+    spec: str | list[str], storage_options: dict | None = None
+) -> list[str]:
+    """Resolve a store specification to an ordered list of store paths.
 
-def merge_blocks(interval_starts: np.ndarray, interval_ends: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    Parameters
+    ----------
+    spec : str or list of str
+        A single path, a list of paths, or a glob pattern. Glob patterns may be local (``"stores/argo_*.zarr"``)
+        or remote (``"s3://bucket/argo_*.zarr"``, resolved via fsspec).
+    storage_options : dict, optional
+        Passed to fsspec for remote globs, e.g. ``{"anon": True}``.
+
+    Returns
+    -------
+    list of str
+        The resolved store paths, sorted by name.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the pattern resolves to no stores.
+    """
+    storage_options = storage_options or {}
+    if isinstance(spec, (str, os.PathLike)):
+        spec = str(spec)
+        if any(c in spec for c in "*?["):
+            if "://" in spec:
+                import fsspec
+
+                fs, p = fsspec.core.url_to_fs(spec, **storage_options)
+                proto = spec.split("://")[0]
+                stores = sorted(f"{proto}://{x}" for x in fs.glob(p))
+            else:
+                stores = sorted(glob.glob(spec))
+        else:
+            stores = [spec]
+    else:
+        stores = [str(s) for s in spec]
+    if not stores:
+        raise FileNotFoundError(f"No store found for {spec!r}")
+    return stores
+
+
+def merge_blocks(
+    interval_starts: np.ndarray, interval_ends: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
     """Merge consecutive or overlapping [start, end) intervals into contiguous blocks.
 
     Both inputs must be 1-D arrays of half-open intervals sorted in ascending
@@ -52,3 +94,53 @@ def merge_blocks(interval_starts: np.ndarray, interval_ends: np.ndarray) -> tupl
     block_ends = interval_ends[np.r_[block_break_indices - 1, interval_ends.size - 1]]
 
     return block_starts, block_ends
+
+
+def plan_reads(
+    start: np.ndarray, size: np.ndarray, store: np.ndarray, sel: np.ndarray
+) -> tuple[list, np.ndarray, np.ndarray]:
+    """Compute the lazy‑read plan for a selection of profiles.
+
+    Given the per‑profile point layout of the selected profiles, this function determines:
+
+    - how the points are grouped into contiguous blocks per store,
+    - and which selected profile and level number each point belongs to.
+
+    Parameters
+    ----------
+    start : np.ndarray
+        ``row_start`` of each selected profile (int64).
+    size : np.ndarray
+        ``row_size`` of each selected profile (int64), same length as ``start``.
+    store : np.ndarray
+        Store index of each selected profile, same length as ``start``.
+    sel : np.ndarray
+        Selected (sorted, unique) profile indices; length = number of profiles.
+
+    Returns
+    -------
+    blocks : list of (int, np.ndarray, np.ndarray)
+        Per store (ascending): ``(store_idx, block_starts, block_ends)``, the merged
+        contiguous ``[start, end)`` point ranges to read.
+    local : np.ndarray
+        Profile position in ``sel`` for each point (length ``size.sum()``).
+    level : np.ndarray
+        0‑based level within the profile for each point, same order as ``local``.
+
+    Notes
+    -----
+    ``sel`` is sorted, so stores are visited in order and points come out in profile order.
+    """
+    # Position in `sel` and level number of each selected point (vectorised)
+    offsets = np.cumsum(size) - size
+    local = np.repeat(np.arange(sel.size), size)
+    level = np.arange(size.sum()) - offsets[local]
+
+    # Lazy selection of the points: sel is sorted, so stores are visited in order and the
+    # points come out in the same order as the profiles.
+    blocks = []  # (store, block_starts, block_ends)
+    for k in np.unique(store):
+        m = store == k
+        block_starts, block_end = merge_blocks(start[m], start[m] + size[m])
+        blocks.append((k, block_starts, block_end))
+    return blocks, local, level
