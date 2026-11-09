@@ -16,9 +16,7 @@ The full (expert) dataset:
 
 A derived version following the AST/ADMT guideline to select Argo measurements suitable for research is also available (See [What is the difference between an 'R' and a 'D' profile file?](https://argo.ucsd.edu/data/data-faq/)):
 - has: 15_354 floats, 2_255_098 P/T/S profiles and 936_728_750 measurement points.
-- is about 4.5 GB.
-- is available for testing in 1 version:
-  - As a single zarr store (~4.5 GB)
+- is available for testing in 1 version, as a single zarr store (~4.5 GB).
 - is available for testing through 3 protocoles: local, https, s3.
 
 The ARGOFLAT collection of datasets basically follow the Argopy user modes:
@@ -36,10 +34,10 @@ Open or connect to an ArgoFlat dataset:
 from argoflat import FlatData
 
 fd = FlatData("stores/argoflat_expert.zarr")  # all floats in 1 zarr
+# fd = FlatData("stores/argoflat_research.zarr")  # all floats in 1 zarr
+
 # fd = FlatData("stores_1000/argoflat_expert_0*.zarr") # 1000 floats per zarr
 # fd = FlatData("stores_2000/argoflat_expert_0*.zarr") # 2000 floats per zarr
-
-# fd = FlatData("stores/argoflat_research.zarr")  # all floats in 1 zarr
 
 # fd = FlatData("s3://bucket/argoflat_*.zarr", anon=True)
 ```
