@@ -1,10 +1,11 @@
-import glob as _glob
+import glob
 import os
 import warnings
 
 import numpy as np
 import pandas as pd
 import xarray as xr
+from argopy.utils import to_list
 
 from argopy.utils.checkers import check_wmo, check_cyc
 
@@ -54,14 +55,16 @@ class FlatData:
     >>> ds = fd[100]; ds = fd[10:20]; ds = fd[[1, 5, 8]]
     """
 
-    # Number of contiguous blocks above which we fall back to a single ``isel`` per store
-    # instead of concatenating one slice per block.
-    MAX_RUNS = 50
 
-    def __init__(self, stores, broadcast=False, **storage_options):
+
+    def __init__(self, stores, broadcast=False, MAX_RUNS=200, **storage_options):
         self._spec = stores
         self.broadcast = broadcast
         self._kw = {"storage_options": storage_options} if storage_options else {}
+        self.MAX_RUNS = MAX_RUNS
+        """Number of contiguous blocks above which we fall back to a single ``isel`` per store 
+        instead of concatenating one slice per block."""
+
         self.refresh()
 
     # ------------------------------------------------------------------ opening
@@ -79,7 +82,7 @@ class FlatData:
                     proto = spec.split("://")[0]
                     stores = sorted(f"{proto}://{x}" for x in fs.glob(p))
                 else:
-                    stores = sorted(_glob.glob(spec))
+                    stores = sorted(glob.glob(spec))
             else:
                 stores = [spec]
         else:
@@ -188,7 +191,7 @@ class FlatData:
             block_starts, block_ends = merge_blocks(start[m], start[m] + size[m])
             blocks.append((k, block_starts, block_ends))
 
-        if sum(len(block_starts) for _, block_starts, _ in blocks) <= self.MAX_RUNS:
+        if self.MAX_RUNS is not None and sum(len(block_starts) for _, block_starts, _ in blocks) <= self.MAX_RUNS:
             parts = [
                 self.pts_stores[store].isel(N_POINTS=slice(int(a), int(b)))
                 for store, block_starts, block_ends in blocks
@@ -252,6 +255,11 @@ class FlatData:
 
         return np.flatnonzero(cond)
 
+    def _sel_year(self, year:int):
+        year = to_list(year)
+        cond = np.isin(self.prf[self._TIME].dt.year, year)
+        return np.flatnonzero(cond)
+
     # ------------------------------------------------------------ public API
 
     def float(self, WMO, broadcast=None):
@@ -282,18 +290,23 @@ class FlatData:
         sel = self._sel_region(box)
         return self._get_profiles(sel, broadcast=broadcast)
 
-    # ------------------------------------------------------------ properties
-    @property
-    def profiles(self):
-        """Copy of the profile index, to build custom selections (see :meth:`__getitem__`)
+    def year(self, year, broadcast=None):
+        """All profiles of one or more years"""
+        sel = self._sel_year(year)
+        return self._get_profiles(sel, broadcast=broadcast)
 
-        Examples
-        --------
-        >>> p = fd.profiles
-        >>> idx = np.flatnonzero((p.DATA_MODE == b"D").values)
-        >>> ds = fd[idx]
-        """
-        return self.prf.copy()
+    # ------------------------------------------------------------ properties
+    # @property
+    # def profiles(self):
+    #     """Copy of the profile index, to build custom selections (see :meth:`__getitem__`)
+    #
+    #     Examples
+    #     --------
+    #     >>> p = fd.profiles
+    #     >>> idx = np.flatnonzero((p.DATA_MODE == b"D").values)
+    #     >>> ds = fd[idx]
+    #     """
+    #     return self.prf.copy()
 
     @property
     def N_PROF(self):
