@@ -152,14 +152,15 @@ class FlatData:
             else xr.concat(prfs, dim="N_PROF", combine_attrs="override")
         )
         """Description of profiles as :class:`xr.Dataset`"""
+
         self.prf["row_size"].attrs = {
             "standard_name": "number_of_levels",
-            "sample_dimension": "N_POINTS",
+            "sample_dimension": "N_POINTS",  # https://cfconventions.org/Data/cf-conventions/cf-conventions-1.8/cf-conventions.html#_contiguous_ragged_array_representation
             "long_name": "Number of valid levels per profile (CF count variable)",
         }
         self.prf["row_start"].attrs = {
-            "long_name": "Offset of each profile into the concatenated points "
-            "(derived: exclusive cumulative sum of row_size)",
+            "long_name": "Offset of each profile into the concatenated points.",
+            "comment": "Redundant to row_size = exclusive cumulative sum of row_size",
         }
         self.prf["store"] = (
             "N_PROF",
@@ -274,14 +275,17 @@ class FlatData:
             prf = prf.assign_coords(N_PROF=("N_PROF", sel))
             out = out.assign(
                 puid=("N_POINTS", sel[local]),
-                attrs={
+            )
+            out = xr.merge([out, prf], combine_attrs="override")
+            out["puid"].attrs.update(
+                {
                     "long_name": "Profile index (CF instance variable)",
                     "cf_role": "profile_id",
                 },
             )
-            out = xr.merge([out, prf], combine_attrs="override")
 
         out.attrs.update(self.pts_stores[0].attrs)
+        out.attrs.update({'featureType': 'profile'})
         return out
 
     # ------------------------------------------------------------ public API
