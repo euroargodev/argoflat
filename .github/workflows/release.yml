@@ -48,7 +48,7 @@ jobs:
       id-token: write
     steps:
       - name: Install uv
-        uses: astral-sh/setup-uv@v9
+        uses: astral-sh/setup-uv@v10.3.3
         with:
           python-version: 3.12
           enable-cache: false
@@ -60,7 +60,7 @@ jobs:
           path: dist/
 
       - name: Generate PEP 740 attestations
-        uses: astral-sh/attest-action@39b6ce43875c196a579e31635b11aa2a2036384a # v0.0.7
+        uses: astral-sh/attest-action@v0.0.7
 
       - name: Publish to TestPyPI
         run: uv publish --index testpypi
