@@ -3,7 +3,7 @@ import warnings
 import numpy as np
 import xarray as xr
 
-from argoflat.utils import resolve_stores, plan_reads
+from argoflat.utils import resolve_stores, plan_reads, flatsizeof
 from argoflat import select
 
 
@@ -53,6 +53,7 @@ class FlatData:
         stores: str | list[str],
         broadcast: bool = False,
         MAX_RUNS: int | None = 200,
+        dry: bool = False,
         **storage_options,
     ):
         """Initialize the flat collection of points and open its stores.
@@ -88,6 +89,7 @@ class FlatData:
         self.broadcast = broadcast
         self._kw = {"storage_options": storage_options} if storage_options else {}
         self.MAX_RUNS = MAX_RUNS
+        self.dry = dry
         self.refresh()
 
     # ------------------------------------------------------------------ opening
@@ -285,12 +287,17 @@ class FlatData:
             )
 
         out.attrs.update(self.pts_stores[0].attrs)
-        out.attrs.update({'featureType': 'profile'})
+        out.attrs.update({"featureType": "profile"})
         return out
 
     # ------------------------------------------------------------ public API
 
-    def float(self, WMO: int | list[int], broadcast: None | bool = None) -> xr.Dataset:
+    def float(
+        self,
+        WMO: int | list[int],
+        broadcast: None | bool = None,
+        dry: bool | None = None,
+    ) -> xr.Dataset:
         """All profiles of one or more floats.
 
         Parameters
@@ -312,10 +319,16 @@ class FlatData:
             ds = fd.float([1901514, 1902284])
         """
         sel = select.float(self.prf, WMO)
+        if (dry is not None and dry) or self.dry:
+            return len(sel)
         return self.get_profiles(sel, broadcast=broadcast)
 
     def profile(
-        self, WMO: int | list[int], CYC: int | list[int], broadcast: None | bool = None
+        self,
+        WMO: int | list[int],
+        CYC: int | list[int],
+        broadcast: None | bool = None,
+        dry: bool | None = None,
     ) -> xr.Dataset:
         """Profiles of one or more floats, for one or more cycle numbers.
 
@@ -339,9 +352,13 @@ class FlatData:
             ds = fd.profile(1901514, [2, 3])
         """
         sel = select.profile(self.prf, WMO, CYC)
+        if (dry is not None and dry) or self.dry:
+            return len(sel)
         return self.get_profiles(sel, broadcast=broadcast)
 
-    def region(self, box: list, broadcast: None | bool = None) -> xr.Dataset:
+    def region(
+        self, box: list, broadcast: None | bool = None, dry: bool | None = None
+    ) -> xr.Dataset:
         """Profiles in a space/time box.
 
         Parameters
@@ -354,9 +371,16 @@ class FlatData:
             Note that ``date_min`` and ``date_max`` are strings.
         """
         sel = select.region(self.prf, box, self._TIME)
+        if (dry is not None and dry) or self.dry:
+            return len(sel)
         return self.get_profiles(sel, broadcast=broadcast)
 
-    def year(self, year: int | list[int], broadcast: None | bool = None) -> xr.Dataset:
+    def year(
+        self,
+        year: int | list[int],
+        broadcast: None | bool = None,
+        dry: bool | None = None,
+    ) -> xr.Dataset:
         """Profiles for one or more year(s).
 
         Parameters
@@ -378,20 +402,9 @@ class FlatData:
             ds = fd.year([2024, 2025])
         """
         sel = select.year(self.prf, year, self._TIME)
+        if (dry is not None and dry) or self.dry:
+            return len(sel)
         return self.get_profiles(sel, broadcast=broadcast)
-
-    # ------------------------------------------------------------ properties
-    # @property
-    # def profiles(self):
-    #     """Copy of the profile index, to build custom selections (see :meth:`__getitem__`)
-    #
-    #     Examples
-    #     --------
-    #     >>> p = fd.profiles
-    #     >>> idx = np.flatnonzero((p.DATA_MODE == b"D").values)
-    #     >>> ds = fd[idx]
-    #     """
-    #     return self.prf.copy()
 
     @property
     def N_PROF(self) -> int:
@@ -457,6 +470,7 @@ class FlatData:
             if d["time"][0] is None
             else f"[{str(d['time'][0])[:16]}, {str(d['time'][1])[:16]}]"
         )
+        sizeof = flatsizeof(self, fmt=True)
         return "\n".join(
             [
                 "<argopy.flatdata>",
@@ -468,6 +482,9 @@ class FlatData:
                 ),
                 f"Dimensions: (N_PROF: {self.N_PROF:_}, N_POINTS: {self.N_POINTS:_})",
                 f"Broadcast: {self.broadcast}",
+                f"Bytes:",
+                f" - On disk: {sizeof['disk']}",
+                f" - In memory if loaded: {sizeof['ram_max']}",
                 "Domain:",
                 f" - Longitude: {fmt(*d['lon'])}",
                 f" - Latitude: {fmt(*d['lat'])}",
