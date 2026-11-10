@@ -1,6 +1,6 @@
 [project]
 name = "argoflat"
-version = "0.1.0"
+version = "0.1.0rc1"
 description = "ARGOFLAT: The Argo dataset as a lossless, analysis-ready cloud-optimised contiguous ragged array"
 readme = "README.md"
 authors = [
