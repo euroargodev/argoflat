@@ -1,0 +1,69 @@
+name: "Build and Publish release to PyPI"
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      # Publish on version tags, e.g. v0.1.0
+      - "v[0-9]+.[0-9]+.[0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+rc[0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+[ab][0-9]+"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v9
+        with:
+          python-version: 3.12
+          enable-cache: false
+
+      - name: Install the project
+        run: uv sync --all-groups
+
+      - name: Build wheel
+        run: uv build
+
+      - name: Upload distributions as artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: releases
+          path: dist/
+
+  publish-to-TestPyPI:
+    needs:
+      - build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+    permissions:
+      id-token: write
+    steps:
+      - name: Install uv
+        uses: astral-sh/setup-uv@v9
+        with:
+          python-version: 3.12
+          enable-cache: false
+
+      - name: Download distributions artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: releases
+          path: dist/
+
+      - name: Generate PEP 740 attestations
+        uses: astral-sh/attest-action@39b6ce43875c196a579e31635b11aa2a2036384a # v0.0.7
+
+      - name: Publish to TestPyPI
+        run: uv publish --index testpypi
+#        run: uv publish --trusted-publishing always
+#        env:
+#          UV_PUBLISH_URL: https://test.pypi.org/legacy/
