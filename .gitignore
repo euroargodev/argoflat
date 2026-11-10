@@ -17,3 +17,4 @@ wheels/
 local_work/
 cli/
 DEV.md
+.ipynb_checkpoints
