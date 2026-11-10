@@ -63,7 +63,7 @@ jobs:
         uses: astral-sh/attest-action@v0.0.7
 
       - name: Publish to TestPyPI
-        run: uv publish --index testpypi
-#        run: uv publish --trusted-publishing always
-#        env:
-#          UV_PUBLISH_URL: https://test.pypi.org/legacy/
+#        run: uv publish --index testpypi
+        run: uv publish --trusted-publishing always
+        env:
+          UV_PUBLISH_URL: https://test.pypi.org/legacy/
