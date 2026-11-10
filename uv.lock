@@ -216,10 +216,7 @@ version = "0.1.0rc1"
 source = { editable = "." }
 dependencies = [
     { name = "argopy" },
-    { name = "bokeh" },
-    { name = "dask" },
-    { name = "distributed" },
-    { name = "fsspec" },
+    { name = "dask", extra = ["distributed"] },
     { name = "h5py" },
     { name = "netcdf4" },
     { name = "pyarrow" },
@@ -231,6 +228,7 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "black" },
+    { name = "bokeh" },
     { name = "cf-xarray" },
     { name = "ipykernel" },
     { name = "ipython" },
@@ -243,22 +241,20 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "argopy", specifier = "==1.5" },
-    { name = "bokeh", specifier = ">=3.10.1" },
-    { name = "dask", specifier = ">=2026.8.0" },
-    { name = "distributed", specifier = ">=2026.8.0" },
-    { name = "fsspec", specifier = ">=2026.9.0" },
-    { name = "h5py", specifier = ">=3.16.0" },
-    { name = "netcdf4", specifier = ">=1.7.5.1.post1" },
-    { name = "pyarrow", specifier = ">=26.0.0" },
-    { name = "s3fs", specifier = ">=2026.9.0" },
-    { name = "xarray", specifier = ">=2026.9.0" },
-    { name = "zarr", specifier = ">=3.4.2" },
+    { name = "argopy", specifier = ">=1.5" },
+    { name = "dask", extras = ["distributed"], specifier = ">=2026.8" },
+    { name = "h5py", specifier = ">=3.16" },
+    { name = "netcdf4", specifier = ">=1.7" },
+    { name = "pyarrow", specifier = ">=26.0" },
+    { name = "s3fs", specifier = ">=2026.9" },
+    { name = "xarray", specifier = ">=2026.9" },
+    { name = "zarr", specifier = ">=3.4" },
 ]
 
 [package.metadata.requires-dev]
 dev = [
     { name = "black", specifier = ">=26.10.1" },
+    { name = "bokeh", specifier = ">=3.10" },
     { name = "cf-xarray", specifier = ">=0.11.3" },
     { name = "ipykernel", specifier = ">=7.4.0" },
     { name = "ipython", specifier = ">=9.17.1" },
@@ -779,6 +775,11 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/33/a7/6b3c7ac32b642fbbe0821111654e0bd8cfbe88f68560bcf23cc78ab35c71/dask-2026.8.0.tar.gz", hash = "sha256:8a94c37b5de6d869343340dc26c3c3acca7ec48a3abdabe00ea3abb1125884d5", size = 11561752, upload-time = "2026-08-24T19:21:25.906Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/f8/3a/4fc99e788bcfa1b3b3f21abf57da45898d807d007e7f6fd1c7300904eb70/dask-2026.8.0-py3-none-any.whl", hash = "sha256:ccc0c83a189b0398602435189771d28dad7b5773b6089bb8dce14ae732dd782c", size = 1492182, upload-time = "2026-08-24T19:21:23.997Z" },
+]
+
+[package.optional-dependencies]
+distributed = [
+    { name = "distributed" },
 ]
 
 [[package]]

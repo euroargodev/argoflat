@@ -18,20 +18,17 @@ classifiers = [
         "Natural Language :: English",
 ]
 license-files = ["LICENSE"]
-
 requires-python = ">=3.12"
+
 dependencies = [
-    "argopy==1.5",
-    "bokeh>=3.10.1",
-    "dask>=2026.8.0",
-    "distributed>=2026.8.0",
-    "fsspec>=2026.9.0",
-    "h5py>=3.16.0",
-    "netcdf4>=1.7.5.1.post1",
-    "pyarrow>=26.0.0",
-    "s3fs>=2026.9.0",
-    "xarray>=2026.9.0",
-    "zarr>=3.4.2",
+    "argopy>=1.5",
+    "dask[distributed]>=2026.8",
+    "h5py>=3.16",
+    "netcdf4>=1.7",
+    "pyarrow>=26.0",
+    "s3fs>=2026.9",
+    "xarray>=2026.9",
+    "zarr>=3.4",
 ]
 
 [build-system]
@@ -41,6 +38,7 @@ build-backend = "uv_build"
 [dependency-groups]
 dev = [
     "black>=26.10.1",
+    "bokeh>=3.10",
     "cf-xarray>=0.11.3",
     "ipykernel>=7.4.0",
     "ipython>=9.17.1",
@@ -50,9 +48,3 @@ dev = [
     "pytest>=9.1.1",
     "python-dotenv>=1.2.4",
 ]
-
-[[tool.uv.index]]
-name = "testpypi"
-url = "https://test.pypi.org/simple/"
-publish-url = "https://test.pypi.org/legacy/"
-explicit = true
