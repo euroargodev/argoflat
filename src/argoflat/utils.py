@@ -2,6 +2,7 @@ import numpy as np
 import xarray as xr
 import glob
 import os
+import fsspec
 
 
 def resolve_stores(
@@ -144,3 +145,64 @@ def plan_reads(
         block_starts, block_end = merge_blocks(start[m], start[m] + size[m])
         blocks.append((k, block_starts, block_end))
     return blocks, local, level
+
+
+def zarr_size(path):
+    return sum(
+        os.path.getsize(os.path.join(dp, f))
+        for dp, _, files in os.walk(path)
+        for f in files
+    )
+
+# def zarr_size(path: str) -> int:
+#     """Total size in bytes of a zarr store.
+#     Works with local paths, s3://, and http(s):// URLs.
+#     """
+#     fs, path = fsspec.core.url_to_fs(path)
+#     if fs.protocol in ['file', 's3']:
+#         return fs.du(path)
+#     return None
+
+
+def sizeof_fmt(num, suffix="B"):
+    if num is None:
+        return ''
+    for unit in ("", "Ki", "Mi", "Gi", "Ti", "Pi", "Ei", "Zi"):
+        if abs(num) < 1024.0:
+            return f"{num:3.1f}{unit}{suffix}"
+        num /= 1024.0
+    return f"{num:.1f}Yi{suffix}"
+
+
+def flatsizeof(fd: "FlatData", fmt=False):
+    # "points" group:
+    # Theoretical size, if the entire object would be loaded in memory:
+    pts_nbytes = 0
+    for s in fd.pts_stores:
+        for v in s.data_vars:
+            pts_nbytes += s[v].nbytes
+
+    # "profiles" group:
+    # Theoretical size, if the entire object would be loaded in memory:
+    prf_nbytes = 0
+    for v in fd.prf.data_vars:
+        prf_nbytes += fd.prf[v].nbytes
+
+    # Size of zarr archives on disk:
+    stores_size_disk = []
+    for s in fd.stores:
+        stores_size_disk.append(zarr_size(s))
+
+    data = {
+        "disk": sum(stores_size_disk),
+        "disk_ave": int(sum(stores_size_disk) / len(stores_size_disk)),
+        "ram_max": pts_nbytes + prf_nbytes,
+        "ram_max_pts": pts_nbytes,
+        "ram_max_prf": prf_nbytes,
+    }
+
+    if fmt:
+        for key, val in data.items():
+            data[key] = sizeof_fmt(val)
+
+    return data
