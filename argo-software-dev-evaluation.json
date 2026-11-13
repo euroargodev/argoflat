@@ -1,0 +1,158 @@
+{
+  "targetLevel": "Novice",
+  "metadata": {
+    "version": "1.0",
+    "tool": "EuroArgo Software Evaluator"
+  },
+  "repository": {
+    "owner": "euroargodev",
+    "repo": "argoflat",
+    "url": "https://github.com/euroargodev/argoflat"
+  },
+  "evaluation": {
+    "level": "Novice",
+    "targetLevel": "Novice",
+    "achievedLevel": "Expert",
+    "score": 1,
+    "stats": {
+      "totalCriteria": 9,
+      "metCriteria": 9,
+      "unmetCriteria": 0,
+      "weightedScore": 9,
+      "totalWeight": 9,
+      "autoCriteria": 5,
+      "manualCriteria": 4,
+      "targetLevel": "Novice"
+    }
+  },
+  "details": {
+    "18": {
+      "title": "Non-Argo Data used by the software should be accessible online",
+      "level": "Novice",
+      "category": "Argo Compliance",
+      "group": "General",
+      "status": "met",
+      "weight": 1,
+      "type": "manual",
+      "evidence": "NA",
+      "url": "https://github.com/euroargodev/software_guidelines/issues/18"
+    },
+    "22": {
+      "title": "The codebase includes comments and is documented to explain the purpose and functionality of each module, class, and function",
+      "level": "Novice",
+      "category": "General",
+      "group": "General",
+      "status": "met",
+      "weight": 1,
+      "type": "manual",
+      "evidence": "We used docstrings following numpy style",
+      "url": "https://github.com/euroargodev/software_guidelines/issues/22"
+    },
+    "34": {
+      "title": "The project includes a LICENSE file",
+      "level": "Novice",
+      "category": "Licensing",
+      "group": "General",
+      "status": "met",
+      "weight": 1,
+      "type": "auto",
+      "evidence": [
+        "LICENSE"
+      ],
+      "url": "https://github.com/euroargodev/software_guidelines/issues/34"
+    },
+    "35": {
+      "title": "The project includes a README file",
+      "level": "Novice",
+      "category": "Documentation",
+      "group": "General",
+      "status": "met",
+      "weight": 1,
+      "type": "auto",
+      "evidence": [
+        "README detected via API"
+      ],
+      "url": "https://github.com/euroargodev/software_guidelines/issues/35"
+    },
+    "36": {
+      "title": "The project includes a basic documentation",
+      "level": "Novice",
+      "category": "Documentation",
+      "group": "General",
+      "status": "met",
+      "weight": 1,
+      "type": "manual",
+      "evidence": "https://github.com/euroargodev/argoflat/README.md",
+      "url": "https://github.com/euroargodev/software_guidelines/issues/36"
+    },
+    "56": {
+      "title": "The software is released under an open-source license",
+      "level": "Novice",
+      "category": "Licensing",
+      "group": "General",
+      "status": "met",
+      "weight": 1,
+      "type": "auto",
+      "evidence": [
+        "LICENSE"
+      ],
+      "url": "https://github.com/euroargodev/software_guidelines/issues/56"
+    },
+    "58": {
+      "title": "The software uses a programming language adopted within the Argo community (e.g. Matlab, Python, R, Java, Julia)",
+      "level": "Novice",
+      "category": "Community",
+      "group": "Argo specific",
+      "status": "met",
+      "weight": 1,
+      "type": "auto",
+      "evidence": [
+        "Python"
+      ],
+      "url": "https://github.com/euroargodev/software_guidelines/issues/58"
+    },
+    "59": {
+      "title": "The software uses an open-source programming language (https://en.wikipedia.org/wiki/List_of_open-source_programming_languages)",
+      "level": "Novice",
+      "category": "General",
+      "group": "General",
+      "status": "met",
+      "weight": 1,
+      "type": "auto",
+      "evidence": [
+        "Python"
+      ],
+      "url": "https://github.com/euroargodev/software_guidelines/issues/59"
+    },
+    "66": {
+      "title": "The project includes a basic description of what it does with or to the Argo dataset (e.g. read index file, calibrate salinity, plot trajectory, assess BGC variables,...)",
+      "level": "Novice",
+      "category": "Argo Compliance",
+      "group": "Argo specific",
+      "status": "met",
+      "weight": 1,
+      "type": "manual",
+      "evidence": "https://github.com/euroargodev/argoflat/README.md",
+      "url": "https://github.com/euroargodev/software_guidelines/issues/66"
+    }
+  },
+  "userAnswers": {
+    "18": {
+      "status": "met",
+      "evidence": "NA"
+    },
+    "22": {
+      "status": "met",
+      "evidence": "We used docstrings following numpy style"
+    },
+    "36": {
+      "status": "met",
+      "evidence": "https://github.com/euroargodev/argoflat/README.md"
+    },
+    "66": {
+      "status": "met",
+      "evidence": "https://github.com/euroargodev/argoflat/README.md"
+    }
+  },
+  "feedback": []
+}
