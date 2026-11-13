@@ -1,7 +1,9 @@
 # ARGOFLAT: The Argo dataset as a lossless, analysis-ready, cloud-optimized contiguous ragged array
+![SIL-2](https://img.shields.io/badge/content-🛠️%202--Functional%20Prototype-00788f?logo=opensourceinitiative&logoColor=green&label=Argo%20R.I.%20Software%20Integration%20Level)
+
 A simple solution to enable fast random access to Argo profiles and ML-ready batch sampling from a global aggregate.
 
-‼️ Work in progress ‼️
+‼️ Work in progress: this is a functional prototype, but the API can change anytime without notice.
 
 Our full Argo dataset is currently build with the entire GDAC pressure, temperature and salinity data (BGC data will follow).
 
