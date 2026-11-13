@@ -3,7 +3,7 @@ import warnings
 import numpy as np
 import xarray as xr
 
-from argoflat.utils import resolve_stores, plan_reads, flatsizeof
+from argoflat.utils import resolve_stores, plan_reads, get_profiles, flatsizeof
 from argoflat import select
 
 
@@ -93,7 +93,7 @@ class FlatData:
         self.refresh()
 
     # ------------------------------------------------------------------ opening
-    def refresh(self) -> None:
+    def refresh(self) -> "FlatData":
         """(Re)open the stores, e.g. after one has been appended to, or new stores were added.
 
         Loads each store's ``profiles`` index into memory, keeps the ``points`` group
@@ -172,7 +172,12 @@ class FlatData:
         self.N_POINTS = int(self.prf["row_size"].sum())
         """Global number of measurements"""
 
-    # -------------------------------------------------------------- variables
+    def load(self, **kwargs) -> "FlatData":
+        # self.prf is already in memory
+        self.pts.load(**kwargs)
+        return self
+
+    # -------------------------------------------------------------- properties
     @property
     def pts(self) -> xr.Dataset:
         """The lazy ``points`` dataset (single‑store collections only).
@@ -203,12 +208,12 @@ class FlatData:
         return [v for v in self.prf.data_vars]
         # return [v for v in self.prf.data_vars if v not in ("row_start", "row_size", "store")]
 
-    def get_profiles(self, sel, broadcast=None) -> xr.Dataset:
-        """Read points and profile variables for a selection of profile indices.
+    def get_profiles(self, sel_prof, broadcast=None) -> xr.Dataset:
+        """Read points and profile variables for a selection of profile indices
 
         Parameters
         ----------
-        sel : array_like of int
+        sel_prof : array_like of int
             Profile indices to load. Sorted and de‑duplicated internally.
         broadcast : bool or None
             If ``None``, uses :attr:`broadcast`. If ``True``, profile variables are
@@ -227,71 +232,49 @@ class FlatData:
         IndexError
             If any index is outside ``[0, N_PROF)``.
         """
-        broadcast = self.broadcast if broadcast is None else broadcast
-
-        sel = np.unique(np.atleast_1d(sel).astype("int64"))  # sorted, unique
-        if sel.size == 0:
-            raise ValueError("No data matching your criteria")
-        if sel[0] < 0 or sel[-1] >= self.N_PROF:
-            raise IndexError(f"Profile index out of range [0, {self.N_PROF - 1}]")
-
-        start = self.prf["row_start"].values[sel].astype("int64")
-        size = self.prf["row_size"].values[sel].astype("int64")
-        store = self.prf["store"].values[sel]
-        blocks, local, level = plan_reads(start, size, store, sel)
-
-        if (
-            self.MAX_RUNS is not None
-            and sum(len(block_starts) for _, block_starts, _ in blocks) <= self.MAX_RUNS
-        ):
-            parts = []
-            for store_idx, block_starts, block_ends in blocks:
-                for a, b in zip(block_starts, block_ends):
-                    parts.append(
-                        self.pts_stores[store_idx].isel(N_POINTS=slice(int(a), int(b)))
-                    )
-        else:
-            point_store = store[local]
-            parts = []
-            for store_idx, _, _ in blocks:
-                pm = point_store == store_idx
-                parts.append(
-                    self.pts_stores[store_idx].isel(
-                        N_POINTS=start[local][pm] + level[pm]
-                    )
-                )
-        out = (
-            parts[0]
-            if len(parts) == 1
-            else xr.concat(parts, "N_POINTS", combine_attrs="override")
+        return get_profiles(
+            sel_prof,
+            self.prf,
+            self.pts_stores,
+            broadcast=broadcast,
+            MAX_RUNS=self.MAX_RUNS,
         )
 
-        out = out.assign_coords(N_LEVELS=("N_POINTS", level))
+    @property
+    def N_PROF(self) -> int:
+        """Total number of profiles across all stores."""
+        return self.prf.sizes["N_PROF"]
 
-        # Profile variables
-        prf = self.prf[self.PROF_VARS].isel(N_PROF=sel)
-        if broadcast:
-            pp = prf.isel(N_PROF=local).rename({"N_PROF": "N_POINTS"})
-            out = out.assign({k: pp[k].variable for k in pp.data_vars})
-        else:
-            prf = prf.assign_coords(N_PROF=("N_PROF", sel))
-            out = out.assign(
-                puid=("N_POINTS", sel[local]),
-            )
-            out = xr.merge([out, prf], combine_attrs="override")
-            out["puid"].attrs.update(
-                {
-                    "long_name": "Profile index (CF instance variable)",
-                    "cf_role": "profile_id",
-                },
-            )
+    @property
+    def n_stores(self) -> int:
+        """Number of stores in the collection."""
+        return len(self.stores)
 
-        out.attrs.update(self.pts_stores[0].attrs)
-        out.attrs.update({"featureType": "profile"})
-        return out
+    @property
+    def domain(self) -> dict:
+        """Space/time domain of the dataset as a dict of ``(min, max)`` tuples.
+
+        Returns
+        -------
+        dict
+            Keys ``"lon"``, ``"lat"``, ``"time"``, each mapping to a ``(min, max)``
+            tuple (or ``(None, None)`` when the extent is unknown).
+        """
+
+        def mm(name):
+            v = self.prf[name].values
+            if v.size == 0 or (
+                np.issubdtype(v.dtype, np.floating) and np.isnan(v).all()
+            ):
+                return (None, None)
+            if np.issubdtype(v.dtype, np.datetime64):
+                v = v[~np.isnat(v)]
+                return (v.min(), v.max()) if v.size else (None, None)
+            return (np.nanmin(v), np.nanmax(v))
+
+        return {"lon": mm("LONGITUDE"), "lat": mm("LATITUDE"), "time": mm(self._TIME)}
 
     # ------------------------------------------------------------ public API
-
     def float(
         self,
         WMO: int | list[int],
@@ -406,39 +389,6 @@ class FlatData:
             return len(sel)
         return self.get_profiles(sel, broadcast=broadcast)
 
-    @property
-    def N_PROF(self) -> int:
-        """Total number of profiles across all stores."""
-        return self.prf.sizes["N_PROF"]
-
-    @property
-    def n_stores(self) -> int:
-        """Number of stores in the collection."""
-        return len(self.stores)
-
-    @property
-    def domain(self) -> dict:
-        """Space/time domain of the dataset as a dict of ``(min, max)`` tuples.
-
-        Returns
-        -------
-        dict
-            Keys ``"lon"``, ``"lat"``, ``"time"``, each mapping to a ``(min, max)``
-            tuple (or ``(None, None)`` when the extent is unknown).
-        """
-
-        def mm(name):
-            v = self.prf[name].values
-            if v.size == 0 or (
-                np.issubdtype(v.dtype, np.floating) and np.isnan(v).all()
-            ):
-                return (None, None)
-            if np.issubdtype(v.dtype, np.datetime64):
-                v = v[~np.isnat(v)]
-                return (v.min(), v.max()) if v.size else (None, None)
-            return (np.nanmin(v), np.nanmax(v))
-
-        return {"lon": mm("LONGITUDE"), "lat": mm("LATITUDE"), "time": mm(self._TIME)}
 
     # --------------------------------------------------------------- dunders
     def __len__(self) -> int:

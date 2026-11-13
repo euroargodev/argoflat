@@ -1,8 +1,9 @@
 import numpy as np
+import pandas as pd
 import xarray as xr
 import glob
 import os
-import fsspec
+from argopy.utils.casting import to_list
 
 
 def resolve_stores(
@@ -147,6 +148,100 @@ def plan_reads(
     return blocks, local, level
 
 
+def get_profiles(sel, prf, pts_stores, broadcast=None, MAX_RUNS=None)-> xr.Dataset:
+    """Select profiles and points according to N_PROF dim indexing
+
+    Read points and profile variables for a selection of profile indices.
+
+    Parameters
+    ----------
+    sel : array_like of int
+        Profile indices to load. Sorted and de‑duplicated internally.
+    prf:
+    pts_stores:
+    broadcast : bool or None
+        If ``None``, uses :attr:`broadcast`. If ``True``, profile variables are
+        repeated along ``N_POINTS``; otherwise they stay on ``N_PROF`` and each
+        point carries a ``PROFILE`` pointer and an ``N_LEVELS`` coordinate.
+    MAX_RUNS:
+
+    Returns
+    -------
+    :class:`xarray.Dataset`
+        The selected points plus profile metadata.
+
+    Raises
+    ------
+    ValueError
+        If ``sel`` is empty.
+    IndexError
+        If any index is outside ``[0, N_PROF)``.
+    """
+    broadcast = broadcast or False
+    N_PROF = prf.sizes["N_PROF"]
+
+    sel = np.unique(np.atleast_1d(sel).astype("int64"))  # sorted, unique
+    if sel.size == 0:
+        raise ValueError("No data matching your criteria")
+    if sel[0] < 0 or sel[-1] >= N_PROF:
+        raise IndexError(f"Profile index out of range [0, {N_PROF - 1}]")
+
+    start = prf["row_start"].values[sel].astype("int64")
+    size = prf["row_size"].values[sel].astype("int64")
+    store = prf["store"].values[sel]
+    blocks, local, level = plan_reads(start, size, store, sel)
+
+    if (
+        MAX_RUNS is not None
+        and sum(len(block_starts) for _, block_starts, _ in blocks) <= MAX_RUNS
+    ):
+        parts = []
+        for store_idx, block_starts, block_ends in blocks:
+            for a, b in zip(block_starts, block_ends):
+                parts.append(
+                    pts_stores[store_idx].isel(N_POINTS=slice(int(a), int(b)))
+                )
+    else:
+        point_store = store[local]
+        parts = []
+        for store_idx, _, _ in blocks:
+            pm = point_store == store_idx
+            parts.append(
+                pts_stores[store_idx].isel(
+                    N_POINTS=start[local][pm] + level[pm]
+                )
+            )
+    out = (
+        parts[0]
+        if len(parts) == 1
+        else xr.concat(parts, "N_POINTS", combine_attrs="override")
+    )
+
+    out = out.assign_coords(N_LEVELS=("N_POINTS", level))
+
+    # Profile variables
+    prf = prf.isel(N_PROF=sel)
+    if broadcast:
+        pp = prf.isel(N_PROF=local).rename({"N_PROF": "N_POINTS"})
+        out = out.assign({k: pp[k].variable for k in pp.data_vars})
+    else:
+        prf = prf.assign_coords(N_PROF=("N_PROF", sel))
+        out = out.assign(
+            puid=("N_POINTS", sel[local]),
+        )
+        out = xr.merge([out, prf], combine_attrs="override")
+        out["puid"].attrs.update(
+            {
+                "long_name": "Profile index (CF instance variable)",
+                "cf_role": "profile_id",
+            },
+        )
+        out['N_PROF'] = np.arange(len(out['N_PROF']))
+
+    out.attrs.update(pts_stores[0].attrs)
+    out.attrs.update({"featureType": "profile"})
+    return out
+
 def zarr_size(path):
     return sum(
         os.path.getsize(os.path.join(dp, f))
@@ -206,3 +301,153 @@ def flatsizeof(fd: "FlatData", fmt=False):
             data[key] = sizeof_fmt(val)
 
     return data
+
+
+def pressure_bin_stats(ds, edges, pres="PRES", dim="N_POINTS", variables=None):
+    """Bin points by pressure and return per-bin stats for every variable.
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Point-layout dataset with dimension ``dim`` (default ``"N_POINTS"``).
+    edges : array-like
+        Bin edges, e.g. ``np.arange(0, 2001, 100)`` (length ``n_bins + 1``).
+    pres : str, optional
+        The pressure (binning) variable, default ``"PRES"``.
+    dim : str, optional
+        The points dimension, default ``"N_POINTS"``.
+    variables : list of str, optional
+        Variables to reduce. Default ``None`` = every numeric data variable.
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per bin. Columns: ``z`` (bin center), ``z_p`` (mean pressure),
+        ``n`` (count), and for each variable ``v`` a pair ``v_mean`` / ``v_std``.
+    """
+    centers = 0.5 * (edges[:-1] + edges[1:])
+    n_bins = len(centers)
+
+    # Assign each point to a bin (out-of-range -> NaN, dropped by groupby)
+    bin_idx = np.digitize(ds[pres].values, edges, right=False) - 1
+    bin_idx = np.where((bin_idx >= 0) & (bin_idx < n_bins), bin_idx, np.nan)
+    ds = ds.assign_coords(pbin=(dim, bin_idx))
+    pbin = ds["pbin"]
+
+    # Which variables to reduce
+    if variables is None:
+        variables = [v for v in ds.data_vars
+                     if np.issubdtype(ds[v].dtype, np.number)]
+        # if v != pres and np.issubdtype(ds[v].dtype, np.number)]
+    variables = to_list(variables)
+
+    data = {
+        "z_p": ds[pres].groupby(pbin).mean(),
+        "n": ds[pres].groupby(pbin).count(),
+    }
+    for v in variables:
+        data[f"{v}_mean"] = ds[v].groupby(pbin).mean()
+        data[f"{v}_std"] = ds[v].groupby(pbin).std()
+
+    out = xr.Dataset(data)
+    out = out.reset_index('pbin')
+    out["z"] = [int(centers[v]) for v in out["pbin"].astype(int).values]
+    order = ["z", "z_p", "n"] + [c for v in variables for c in (f"{v}_mean", f"{v}_std")]
+    return out[order]
+
+
+def time_bin_stats(ds, freq='M', time_var='TIME', dim='N_POINTS',
+                   variables=None, start=None, end=None):
+    """Bin points by month or day and return per-bin stats for every variable.
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Point-layout dataset with dimension ``dim`` (default ``"N_POINTS"``)
+        and a datetime64 time variable ``time_var``.
+    freq : str
+        ``'M'`` (or ``'MS'`` / ``'monthly'``) for monthly bins,
+        ``'D'`` (or ``'daily'``) for daily bins.
+    time_var : str, optional
+        Name of the time variable, default ``"TIME"``.
+    dim : str, optional
+        Points dimension, default ``"N_POINTS"``.
+    variables : list of str, optional
+        Variables to reduce. Default ``None`` = every numeric data variable.
+    start, end : datetime-like, optional
+        If given, only points with ``start <= time <= end`` are binned.
+
+    Returns
+    -------
+    xr.Dataset
+        One row per bin. Vars: ``tbin`` (sort key), ``time`` (label),
+        ``n`` (count), and for each ``v`` a pair ``v_mean`` / ``v_std``.
+    """
+    import pandas as pd
+
+    monthly = freq.upper() in ('M', 'MS', 'MONTH', 'MONTHLY')
+
+    tidx = pd.DatetimeIndex(ds[time_var].values)
+
+    # Optional [start, end] range restriction
+    if start is not None or end is not None:
+        s = pd.Timestamp(start) if start is not None else pd.Timestamp.min
+        e = pd.Timestamp(end) if end is not None else pd.Timestamp.max
+        valid = (tidx >= s) & (tidx <= e)
+    else:
+        valid = np.ones(tidx.size, dtype=bool)
+
+    # Sortable integer bin key + human-readable label
+    if monthly:
+        key = tidx.year * 100 + tidx.month          # 202001, 202002, ...
+        fmt = '%Y-%m'
+    else:
+        key = ((tidx - tidx.min()).astype('timedelta64[ns]').astype('int64')
+               // 10**9 // 86400)                    # integer days since min
+        fmt = '%Y-%m-%d'
+
+    labels = tidx.strftime(fmt)
+    label_map = dict(zip(key[valid], labels[valid]))
+
+    bin_key = np.where(valid, key.astype(float), np.nan)   # out-of-range -> NaN
+    ds = ds.assign_coords(tbin=(dim, bin_key))
+    tbin = ds['tbin']
+
+    # Which variables to reduce
+    if variables is None:
+        variables = [v for v in ds.data_vars
+                     if v != time_var and np.issubdtype(ds[v].dtype, np.number)]
+    variables = to_list(variables)
+
+    data = {'n': ds[time_var].groupby(tbin).count()}
+    for v in variables:
+        data[f'{v}_mean'] = ds[v].groupby(tbin).mean()
+        data[f'{v}_std'] = ds[v].groupby(tbin).std()
+
+    out = xr.Dataset(data)
+    out = out.reset_index('tbin')
+    out['time'] = [label_map[int(k)] for k in out['tbin'].astype(int).values]
+    order = ['tbin', 'time', 'n'] + [c for v in variables for c in (f'{v}_mean', f'{v}_std')]
+    return out[order]
+
+
+def gridpoints(time, p, z, time_grid, pres_grid, method='nearest'):
+    from scipy.interpolate import griddata
+
+    # --- numeric time axis (seconds since a reference) ---
+    t0 = pd.Timestamp('2000-01-01')  # any fixed origin
+    t = (pd.DatetimeIndex(time) - t0).total_seconds()
+
+    ok = np.isfinite(t) & np.isfinite(p) & np.isfinite(z)
+
+    # --- target grid ---
+    Tsec, P = np.meshgrid((time_grid - t0).total_seconds(), pres_grid, indexing='ij')  # both (N_TIME, N_PRES)
+
+    # --- interpolate ---
+    zi = griddata((p[ok], t[ok]), z[ok], (P, Tsec), method=method)  # (N_TIME, N_PRES)
+
+    out = xr.DataArray(zi,
+                       dims=('time', 'pres'),
+                       coords={'time': time_grid, 'pres': pres_grid})
+
+    return out
