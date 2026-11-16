@@ -1,5 +1,7 @@
-# ArgoFlat: The Argo dataset as a lossless (not opinionated), analysis-ready, cloud-optimized contiguous ragged array
-![SIL-2](https://img.shields.io/badge/content-🛠️%202--Functional%20Prototype-00788f?logo=opensourceinitiative&logoColor=green&label=Argo%20R.I.%20Software%20Integration%20Level)
+|                                                                                                                                                    <h1>ArgoFlat</h1><p>The Argo dataset as a lossless (not opinionated), analysis-ready, cloud-optimized contiguous ragged array</p>                                                                                                                                                    |
+|:---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------:|
+|            ![SIL-2](https://img.shields.io/badge/content-🛠️%202--Functional%20Prototype-00788f?logo=opensourceinitiative&logoColor=green&label=Argo%20R.I.%20Software%20Integration%20Level) [![Project Status: WIP – Initial development is in progress, but there has not yet been a stable, usable release suitable for the public.](https://www.repostatus.org/badges/latest/wip.svg)](https://www.repostatus.org/#wip)            |
+|                                                                                                                                                                                   [![Pypi][pip-badge]][pip-link] [![Conda][conda-badge]][conda-link]                                                                                                                                                                                    |                
 
 A simple solution to enable fast random access to Argo profiles and ML-ready batch sampling from a global aggregate of all Argo data.
 
@@ -100,3 +102,10 @@ The xarray dataset that is returned has all profiles meta-data loaded in memory 
 
 ***
 🫣 [qwen 3.8](https://huggingface.co/Qwen/Qwen3.8-27B) LLM running on Ifremer self hosted [openwebui](https://openwebui.com) was used as a debugging tool in this _shame project_. 
+
+[pip-badge]: https://img.shields.io/pypi/v/argoflat
+[pip-link]: https://pypi.org/project/argoflat/
+[conda-badge]: https://img.shields.io/conda/vn/conda-forge/argoflat?logo=anaconda
+[conda-link]: https://anaconda.org/conda-forge/argoflat
+[repostatus-badge-active]: http://www.repostatus.org/badges/latest/wip.svg
+[repostatus-link-active]: http://www.repostatus.org/#wip
