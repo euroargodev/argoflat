@@ -52,7 +52,3 @@ dev = [
 ml = [
     "torch>=2.15.0",
 ]
-
-[scripts]
-sync-ml = "uv sync --group ml"
-install-kernel = "uv run --group ml python -m ipykernel install --user --name argoflat-ml --display-name \"Python (argoflat-ml)\""
