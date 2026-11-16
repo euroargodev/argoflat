@@ -3,7 +3,8 @@ import warnings
 import numpy as np
 import xarray as xr
 
-from argoflat.utils import resolve_stores, plan_reads, get_profiles, flatsizeof
+from argoflat.utils import resolve_stores, get_profiles, flatsizeof
+from argoflat.sampler import FlatSampler
 from argoflat import select
 
 
@@ -389,6 +390,72 @@ class FlatData:
             return len(sel)
         return self.get_profiles(sel, broadcast=broadcast)
 
+    def split(self, fractions=(0.8, 0.1, 0.1), by="PLATFORM_NUMBER", seed=0)->list[np.ndarray]:
+        """Reproducible random split of the profiles, e.g. into train/validation/test
+
+        Parameters
+        ----------
+        fractions : sequence of float
+            Relative size of each subset (normalised to sum to 1).
+        by : str or None
+            Profile variable whose unique values are kept together in the same subset.
+            The default, ``"PLATFORM_NUMBER"``, puts all profiles of a float in the same subset,
+            which avoids leakage between train and test (successive profiles of a float are
+            strongly correlated). Use ``None`` to split profile by profile.
+        seed : int
+
+        Returns
+        -------
+        list of :class:`numpy.ndarray`
+            One array of profile indices per fraction (sorted, in store order).
+
+        Examples
+        --------
+        ..code-block:: python
+
+            train, val, test = fd.split([0.8, 0.1, 0.1])
+            train_loader = fd.sampler(sel=train, batch_size=128)
+        """
+        f = np.asarray(fractions, dtype="float64")
+        if (f < 0).any() or f.sum() == 0:
+            raise ValueError("fractions must be non-negative and not all zero")
+        if by is None:
+            n_units, inverse = self.N_PROF, np.arange(self.N_PROF)
+        else:
+            _, inverse = np.unique(self.prf[by].values, return_inverse=True)
+            n_units = int(inverse.max()) + 1
+
+        rng = np.random.default_rng(seed)
+        perm = rng.permutation(n_units)
+        edges = np.round(np.cumsum(f) / f.sum() * n_units).astype(int)
+        edges[-1] = n_units
+        unit_subset = np.empty(n_units, dtype="int64")
+        lo = 0
+        for i, hi in enumerate(edges):
+            unit_subset[perm[lo:hi]] = i
+            lo = hi
+        subset = unit_subset[inverse]
+        return [np.flatnonzero(subset == i) for i in range(len(f))]
+
+    def sampler(self, sel=None, **kwargs):
+        """Random batch sampler for training machine learning models
+
+        See :class:`FlatSampler` for the parameters.
+
+        Examples
+        --------
+        ..code-block:: python
+        
+            train, val, test = fd.split()
+            loader = fd.sampler(sel=train, variables=["PRES", "TEMP", "PSAL"],
+                                batch_size=128, max_levels=500, seed=42)
+            for epoch in range(10):
+                loader.set_epoch(epoch)
+                for batch in loader:
+                    x = batch["TEMP"]      # (batch, max_levels), NaN where no data
+                    m = batch["mask"]      # (batch, max_levels), True on valid levels
+        """
+        return FlatSampler(self, sel=sel, **kwargs)
 
     # --------------------------------------------------------------- dunders
     def __len__(self) -> int:
@@ -430,7 +497,7 @@ class FlatData:
                     if self.n_stores == 1
                     else f" ({self.stores[0]} ... {self.stores[-1]})"
                 ),
-                f"Dimensions: (N_PROF: {self.N_PROF:_}, N_POINTS: {self.N_POINTS:_})",
+                f"Dimensions: (N_PROF: {self.N_PROF:_}, N_POINTS: {self.N_POINTS:_}) in {len(np.unique(self.prf['PLATFORM_NUMBER'])):_} floats/WMOs",
                 f"Broadcast: {self.broadcast}",
                 f"Bytes:",
                 f" - On disk: {sizeof['disk']}",
